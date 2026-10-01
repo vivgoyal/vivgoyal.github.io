@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Card Advisor</title>
+<meta name="apple-mobile-web-app-title" content="Card Advisor">
+<meta name="description" content="Pick the best credit card for each purchase, track credits and perks, and see whether each card is worth its fee. Runs entirely in your browser.">
+<style>
+:root{--bg:#f3f5f8;--panel:#fff;--ink:#14181f;--mute:#5d6673;--line:#dfe3ea;--acc:#1f5eff;--acc-ink:#fff;--good:#0e8a5f;--warn:#b4531a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1319;--panel:#182029;--ink:#eef1f6;--mute:#9aa5b4;--line:#2a3441;--acc:#6f95ff;--acc-ink:#0b1020;--good:#4cd39b;--warn:#f0a06a}}
+:root[data-theme="dark"]{--bg:#0f1319;--panel:#182029;--ink:#eef1f6;--mute:#9aa5b4;--line:#2a3441;--acc:#6f95ff;--acc-ink:#0b1020;--good:#4cd39b;--warn:#f0a06a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:560px;margin:0 auto;padding:16px 16px 48px}
+h1{font:600 26px/1.1 ui-serif,Georgia,serif;margin:8px 0 14px}
+h2{font:600 18px/1.2 ui-serif,Georgia,serif;margin:22px 0 8px}
+nav{display:flex;gap:6px;margin-bottom:16px}
+nav button{flex:1;padding:10px 2px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;font:inherit;font-size:12px;font-weight:600}
+nav button[aria-current="true"]{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.grid label{margin:4px 0 2px}
+.btn{display:block;width:100%;margin-top:14px;padding:12px;border:0;border-radius:10px;background:var(--acc);color:var(--acc-ink);font:inherit;font-weight:600}
+.btn.ghost{background:transparent;color:var(--mute);border:1px solid var(--line);margin-top:8px}
+.top{background:var(--ink);color:var(--bg);border-radius:14px;padding:18px;margin-bottom:12px}
+.top b{display:block;font:600 24px/1.15 ui-serif,Georgia,serif}
+.top span{opacity:.75;font-size:14px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.mute{color:var(--mute);font-size:14px}
+.good{color:var(--good)}.warn{color:var(--warn)}
+.scroll{overflow-x:auto}
+.used{opacity:.5;text-decoration:line-through}.pk{cursor:pointer}
+.bar{height:6px;background:var(--line);border-radius:3px;margin:6px 0 2px}.bar i{display:block;height:100%;border-radius:3px}
+.x{border:0;background:none;color:var(--warn);font:inherit;padding:0}
+</style>
+</head>
+<body>
+<main>
+<h1>Card Advisor</h1>
+<nav id="nav"></nav>
+<div id="v"></div>
+<p class="mute" style="margin-top:28px">Card Advisor runs entirely in your browser. Nothing is uploaded and there are no logins. Card data was last checked <span id="asof"></span>. Rates, fees and offers change, so confirm with your issuer. This is not financial advice.</p>
+</main>
+<script src="cards.js"></script>
+<script>
+const CATS=[["dining","Dining"],["groceries","Groceries"],["gas","Gas"],["travel","Other travel (cars, cruises)"],["transit","Transit"],["streaming","Streaming"],["online","Online shopping"],["drugstore","Drugstore"],["flights","Other airlines"],["hotels","Other hotels"],["chasetravel","Chase Travel portal"],["c1travel","Capital One Travel flights & other"],["c1hotel","Capital One Travel hotels & cars"],["amextravel","Amex Travel portal"],["delta","Delta flights"],["marriott","Marriott hotels"],["hyatt","Hyatt hotels"],["ihg","IHG hotels"],["atmos","Alaska & Hawaiian"],["qatar","Qatar Airways"],["other","Everything else"]];
+const BR=["marriott","hyatt","ihg","atmos","qatar"];const TR=[...BR,"flights","hotels","chasetravel","c1travel","c1hotel","amextravel"];
+const KW={chasetravel:/chase travel|ultimate rewards travel/i,c1hotel:/(cot|capital ?one travel|c1 travel)\W*(htl|hotel|car|rent|rnt|veh)/i,c1travel:/capital ?one travel|c1 travel|\bcot\b/i,amextravel:/amex travel|american express travel|amextravel|fine hotels/i,delta:/delta air|delta\.com/i,marriott:/marriott|courtyard|sheraton|westin|ritz-carlton|st\.? regis|residence inn|fairfield inn|renaissance hotel|aloft|moxy|bonvoy/i,hyatt:/hyatt|andaz/i,ihg:/\bihg\b|holiday inn|intercontinental|kimpton|crowne plaza|hotel indigo|staybridge|candlewood|voco/i,atmos:/alaska ?air|hawaiian ?air/i,qatar:/qatar ?air/i,dining:/restaurant|cafe|coffee|starbucks|mcdonald|doordash|uber ?eats|grubhub|pizza|grill|taco|chipotle|burger|kitchen|bistro|bakery|dunkin|bar &|\bbar\b/i,
+groceries:/grocery|market|safeway|kroger|trader joe|whole foods|costco|aldi|publix|wegmans|h-e-b|walmart|target|instacart/i,
+gas:/shell|chevron|exxon|mobil|bp |gas|fuel|sunoco|76 |arco|valero|texaco/i,
+flights:/airline|airlines|united|american air|southwest|jetblue|spirit air|frontier air|british airways|lufthansa|emirates|air france|klm|flight/i,hotels:/hotel|\binn\b|resort|hilton|airbnb|vrbo|motel|hampton|doubletree|wyndham|best western|expedia|booking\.com|hotels\.com/i,travel:/hertz|avis|enterprise rent|budget rent|national car|cruise|carnival|royal caribbean|viator|tour/i,
+transit:/uber|lyft|metro|transit|mta|bart|parking|toll|amtrak|train/i,
+streaming:/netflix|spotify|hulu|disney|hbo|max\.com|youtube|apple\.com\/bill|prime video|peacock|paramount/i,
+online:/amazon|amzn|ebay|etsy|paypal|shop|best buy|apple store/i,
+drugstore:/cvs|walgreens|rite aid|pharmacy|drug/i};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const $$=n=>"$"+Math.round(n).toLocaleString();
+function load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+let cards=load("adv.cards2",[]);
+let pval=load("adv.pval",100),spend=load("adv.spend",null),tab="best",lookup="",ed=null,pv=load("adv.pv",{}),amt=100;
+function classify(t){for(const[c,r]of Object.entries(KW))if(r.test(t))return c;return"other"}
+const val=(c,cat)=>cval(c,cat); // cents per dollar
+function best(cat){return cards.map(c=>({c,v:val(c,cat)})).sort((a,b)=>b.v-a.v)}
+function nav(){const t=[["best","Best"],["spend","Spend"],["wallet","Wallet"],["fresh","New"],["perks","Perks"],["verdict","Verdict"]];
+$("#nav").innerHTML=t.map(([k,n])=>`<button data-t="${k}" aria-current="${tab==k}">${n}</button>`).join("");
+$("#nav").onclick=e=>{const k=e.target.dataset.t;if(k){tab=k;render()}}}
+function render(){nav();$("#asof").textContent=ASOF||"unknown";if(!cards.length&&!skip){vWelcome();return}({best:vBest,spend:vSpend,wallet:vWallet,fresh:vNew,perks:vPerks,verdict:vVerdict})[tab]()}
+function needCards(){vWelcome()}
+let offers=load("adv.offers",[]);
+const dl=e=>Math.ceil((new Date(e+"T23:59:59")-new Date())/864e5);
+function vBest(){if(!cards.length)return needCards();
+const cat=lookup?classify(lookup):"other";
+$("#v").innerHTML=`<div class="box"><label for="m">Where are you paying? (merchant or type)</label><input id="m" value="${esc(lookup)}" placeholder="e.g. Chipotle, Delta, Shell" autocomplete="off">
+<label for="c">Category</label><select id="c">${CATS.map(([k,n])=>`<option value="${k}" ${k==cat?"selected":""}>${n}</option>`).join("")}</select>
+<label for="a">Amount ($)</label><input id="a" type="number" inputmode="decimal" value="${amt}"></div><div id="ob"></div><div id="r"></div><div id="of"></div>`;
+const live=()=>offers.filter(o=>!o.used&&(!o.exp||dl(o.exp)>=0));
+const show=k=>{const r=best(k),a=parseFloat($("#a").value)||0,lk=lookup.trim().toLowerCase();
+const hit=lk?live().filter(o=>{const m=o.m.toLowerCase();return m&&(lk.includes(m)||m.includes(lk))}):[];
+$("#ob").innerHTML=hit.map(o=>`<div class="box" style="border-color:var(--acc)"><b>Offer on ${esc(o.m)}</b><br>${esc(o.card)}: ${esc(o.r)}${o.min?", spend "+$$(o.min):""}${o.exp?", expires in "+dl(o.exp)+" days":""}</div>`).join("");
+$("#r").innerHTML=`<div class="top"><span>Use</span><b>${esc(r[0].c.name)}</b><span>${mstr(r[0].c,r[0].v)}, about ${fmtE(r[0].c,a*r[0].v)} on ${$$(a)}</span></div><div class="box">${r.slice(1).map(x=>`<div class="row"><span>${esc(x.c.name)}</span><span class="mute" style="text-align:right">${mstr(x.c,x.v)} · ${fmtE(x.c,a*x.v)}</span></div>`).join("")||'<span class="mute">Add more cards to compare.</span>'}</div><p class="mute">Ranked by points per dollar only. Different programs aren't converted to a value.</p>`};
+const list=()=>{const act=offers.map((o,i)=>({o,i})).filter(x=>!x.o.exp||dl(x.o.exp)>=0).sort((a,b)=>(a.o.exp||"9999").localeCompare(b.o.exp||"9999"));
+$("#of").innerHTML=`<h2>My offers</h2><div class="box">${act.length?act.map(({o,i})=>`<div class="row ${o.used?"used":""}"><span>${esc(o.m)}<br><span class="mute">${esc(o.card)}: ${esc(o.r)}${o.min?", spend "+$$(o.min):""}${o.exp?", "+dl(o.exp)+" days left":""}</span></span><span style="white-space:nowrap"><button class="x" data-ou="${i}">${o.used?"Undo":"Used"}</button> <button class="x" data-or="${i}">Remove</button></span></div>`).join(""):'<span class="mute">No offers yet. Add the Amex and Chase offers you see in their apps. Expired ones disappear.</span>'}</div>
+<div class="box"><b>Add an offer</b><label for="oc">Card</label><select id="oc">${cards.map(c=>`<option>${esc(c.name)}</option>`).join("")}</select>
+<label for="om">Merchant</label><input id="om" placeholder="e.g. Best Buy"><label for="or">Reward</label><input id="or" placeholder="e.g. $20 back on $100, or 5x points">
+<div class="grid"><div><label for="os">Spend needed ($)</label><input id="os" type="number" inputmode="decimal"></div><div><label for="oe">Expires</label><input id="oe" type="date"></div></div><button class="btn" id="oadd">Add offer</button></div>`;
+$("#oadd").onclick=()=>{const m=$("#om").value.trim(),r=$("#or").value.trim();if(!m||!r){(m?$("#or"):$("#om")).focus();return}
+offers.push({card:$("#oc").value,m,r,min:parseFloat($("#os").value)||0,exp:$("#oe").value||"",used:false});save("adv.offers",offers);list();show($("#c").value)};
+$("#of").onclick=e=>{const u=e.target.dataset.ou,d=e.target.dataset.or;if(u!==undefined)offers[+u].used=!offers[+u].used;else if(d!==undefined)offers.splice(+d,1);else return;save("adv.offers",offers);list();show($("#c").value)}};
+show(cat);list();
+$("#m").oninput=e=>{lookup=e.target.value;const k=classify(lookup);$("#c").value=k;show(k)};
+$("#c").onchange=e=>show(e.target.value);
+$("#a").oninput=()=>{amt=parseFloat($("#a").value)||0;show($("#c").value)}}
+function vWallet(){const e=ed!=null?cards[ed]:null;const g=k=>e?(e.rates[k]??1):1;
+$("#v").innerHTML=`${!e&&catalog().length?`<div class="box"><b>Add from the card library</b><select id="lb" style="margin-top:8px">${catalog().map(l=>`<option value="${esc(l.name)}">${esc(l.name)}</option>`).join("")}</select><button class="btn ghost" id="la">Add this card</button></div>`:""}<div class="box"><b>${e?"Edit card":"Add your own card"}</b>
+<label for="n">Card name</label><input id="n" value="${e?esc(e.name):""}" placeholder="e.g. Chase Sapphire Preferred">
+<div class="grid"><div><label for="f">Annual fee ($)</label><input id="f" type="number" inputmode="decimal" value="${e?e.fee:0}"></div><div><label for="pg">Points program</label><input id="pg" value="${e?esc(prog(e)):"points"}" placeholder="e.g. Chase Ultimate Rewards points"></div></div>
+<label for="od">Card opened (for the renewal date and anniversary credits)</label><input id="od" type="date" value="${e&&e.open?e.open:""}">${openHint(e)}
+<label for="cr">Credits you'll really use ($/yr)</label><input id="cr" type="number" inputmode="decimal" value="${e?(e.credits||0):0}">
+<label>Points per $1 (or % back for cash back cards), by category</label><div class="grid">${CATS.map(([k,n])=>`<div><label for="r_${k}">${n}</label><input id="r_${k}" type="number" inputmode="decimal" step="0.5" value="${g(k)}"></div>`).join("")}</div>
+<button class="btn" id="add">${e?"Save changes":"Save card"}</button>${e?'<button class="btn ghost" id="cx">Cancel</button>':""}${e&&libOf(e.name)?'<button class="btn ghost" id="rl">Reset fee and rates to library values</button>':""}</div>
+<div class="box">${cards.length?cards.map((c,i)=>`<div class="row"><span>${esc(c.name)}<br><span class="mute">${$$(c.fee)}/yr fee, ${esc(prog(c))}${c.credits?", "+$$(c.credits)+" credits":""}${renewText(c)?"<br>Renews "+renewText(c)+(c.open?"":" (from your annual fee charge)"):(c.fee>0?"<br>Add the open date for a renewal countdown":"")}</span></span><span><button class="x" data-e="${i}">Edit</button> <button class="x" data-d="${i}">Remove</button></span></div>`).join(""):'<span class="mute">No cards yet.</span>'}
+</div><div id="bk"></div>`;
+$("#add").onclick=()=>{const name=$("#n").value.trim();if(!name){$("#n").focus();return}
+const rates={};CATS.forEach(([k])=>rates[k]=parseFloat($("#r_"+k).value)||0);
+const card={name,fee:parseFloat($("#f").value)||0,cpp:1,program:$("#pg").value.trim()||"points",credits:parseFloat($("#cr").value)||0,open:$("#od").value||"",rates};
+if(ed!=null)cards[ed]=card;else cards.push(card);ed=null;save("adv.cards2",cards);vWallet()};
+if($("#cx"))$("#cx").onclick=()=>{ed=null;vWallet()};
+if($("#la"))$("#la").onclick=()=>{addFromLib($("#lb").value);vWallet()};
+if($("#rl"))$("#rl").onclick=()=>{cards[ed]=libCard(libOf(e.name),e.open);ed=null;save("adv.cards2",cards);vWallet()};
+bk();
+$("#v").onclick=ev=>{const d=ev.target.dataset.d,x=ev.target.dataset.e;
+if(d!==undefined){cards.splice(+d,1);ed=null;save("adv.cards2",cards);vWallet()}
+else if(x!==undefined){ed=+x;vWallet();window.scrollTo(0,0)}}}
+function parseCSV(t){const rows=[];let r=[],c="",q=false;for(let i=0;i<t.length;i++){const ch=t[i];
+if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=false}else c+=ch}
+else if(ch=='"')q=true;else if(ch==","){r.push(c);c=""}
+else if(ch=="\n"||ch=="\r"){if(ch=="\r"&&t[i+1]=="\n")i++;r.push(c);c="";if(r.length>1||r[0])rows.push(r);r=[]}else c+=ch}
+if(c||r.length){r.push(c);rows.push(r)}return rows}
+function num(s){if(!s)return NaN;const neg=/[(-]/.test(s);const v=parseFloat(String(s).replace(/[^0-9.]/g,""));return isNaN(v)?NaN:(neg?-v:v)}
+const CRE=/credit|reimburs|benefit|rebate|statement/i;
+async function ingest(files){const cr=[],fd=[],t={};let n=0,skipped=0,mn=Infinity,mx=-Infinity;
+for(const f of files){const rows=parseCSV(await f.text());if(rows.length<2)continue;
+const h=rows[0].map(x=>x.trim().toLowerCase());
+const di=h.findIndex(x=>/date/.test(x)),si=h.findIndex(x=>/desc|merchant|payee|name|memo/.test(x));
+let ai=h.findIndex(x=>/^amount/.test(x));if(ai<0)ai=h.findIndex(x=>/debit/.test(x));
+if(ai<0||si<0){skipped++;continue}
+const tx=[];for(const r of rows.slice(1)){const a=num(r[ai]);if(isNaN(a))continue;tx.push({d:di>=0?new Date(r[di]):null,s:r[si]||"",a})}
+if(!tx.length)continue;
+const core=tx.filter(x=>!/payment|autopay|thank you|credit|reimburs|benefit|rebate|statement|refund/i.test(x.s)),base=core.length?core:tx,pos=base.filter(x=>x.a>0).length,neg=base.filter(x=>x.a<0).length,sign=pos>=neg?1:-1;
+for(const x of tx){if(x.d&&!isNaN(x.d)){mn=Math.min(mn,+x.d);mx=Math.max(mx,+x.d)}
+if(Math.sign(x.a)!==sign){if(CRE.test(x.s)&&!/payment|autopay|thank you/i.test(x.s))cr.push({d:x.d&&!isNaN(x.d)?x.d.toISOString().slice(0,10):null,s:x.s,a:Math.abs(x.a)});continue}
+if(CRE.test(x.s)&&!/payment|autopay|thank you/i.test(x.s)){cr.push({d:x.d&&!isNaN(x.d)?x.d.toISOString().slice(0,10):null,s:x.s,a:-Math.abs(x.a)});continue}
+if(/annual (membership )?fee|membership fee|annual card fee/i.test(x.s)&&x.d&&!isNaN(x.d))fd.push(x.d.toISOString().slice(0,10));
+if(/payment|autopay|thank you|transfer|annual (membership )?fee|membership fee|interest charge|finance charge|late fee|foreign transaction fee|cash advance|balance transfer|adjustment/i.test(x.s))continue;
+const k=classify(x.s);t[k]=(t[k]||0)+Math.abs(x.a)}n+=tx.length}
+if(!n)return{err:"Couldn't find Amount and Description columns in those files."+(skipped?" "+skipped+" file(s) skipped.":"")};
+const ok=isFinite(mn);return{totals:t,credits:cr,feeDate:fd.sort().pop()||"",days:ok?Math.max(30,(mx-mn)/864e5+1):365,n,from:ok?new Date(mn).toISOString().slice(0,10):null,to:ok?new Date(mx).toISOString().slice(0,10):null}}
+function recalc(){const tot={};let n=0;for(const nm in spend.cards){const c=spend.cards[nm];for(const k in c.totals)tot[k]=(tot[k]||0)+c.totals[k]*365/c.days;n+=c.n}spend.totals=tot;spend.days=365;spend.n=n}
+function vSpend(){if(!cards.length)return needCards();
+$("#v").innerHTML=`<div class="box"><b>Upload statements</b><p class="mute">Pick the card, then choose all of that card's CSV files at once. Uploading again for the same card replaces its data. Only category totals are kept, in this browser. Nothing is uploaded anywhere.</p>
+<label for="uc">Card these files are from</label><select id="uc">${cards.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("")}</select>
+<label for="f">CSV files</label><input id="f" type="file" accept=".csv,text/csv" multiple><div id="msg" class="warn"></div>
+<div id="have">${spend&&spend.cards?Object.keys(spend.cards).map(nm=>{const d=spend.cards[nm];return`<div class="row"><span>${esc(nm)}<br><span class="mute">${d.from&&d.to?d.from+" to "+d.to+", ":""}${$$(Object.values(d.totals).reduce((a,b)=>a+b,0))} spent</span></span><button class="x" data-rm="${esc(nm)}">Remove</button></div>`}).join(""):(spend?'<p class="mute">Your earlier upload has no card information. Upload per card to see what each card earned.</p>':"")}</div></div><div id="out"></div>`;
+$("#f").onchange=async e=>{const r=await ingest([...e.target.files]);if(r.err){$("#msg").textContent=r.err;return}
+if(!spend||!spend.cards)spend={cards:{}};spend.cards[$("#uc").value]=r;recalc();save("adv.spend",spend);vSpend()};
+$("#have").onclick=e=>{const nm=e.target.dataset.rm;if(nm===undefined)return;delete spend.cards[nm];if(Object.keys(spend.cards).length)recalc();else spend=null;save("adv.spend",spend);vSpend()};
+if(spend)analyze()}
+function analyze(){const yr=365/spend.days,ann={};
+CATS.forEach(([k])=>ann[k]=(spend.totals[k]||0)*yr);
+const total=Object.values(ann).reduce((a,b)=>a+b,0),pt={},ptc={},wins=cards.map(c=>({c,cats:[],pts:0}));
+CATS.forEach(([k,n])=>{if(!ann[k])return;const r=best(k),top=r[0].v,c0=r[0].c;pt[prog(c0)]=(pt[prog(c0)]||0)+ann[k]*top;ptc[prog(c0)]=c0;
+r.filter(x=>x.v>=top).forEach(x=>{const w=wins.find(y=>y.c===x.c);w.cats.push(n+" "+mstr(x.c,x.v));w.pts+=ann[k]*x.v})});
+let h=`<div class="top"><span>Estimated yearly spend</span><b>${$$(total)}</b><span>Using your top-multiplier card in each category</span></div>`;
+let earnedH="";
+if(spend.cards){const ep={},cp={},epc={},cpc={};let rows="";
+for(const nm in spend.cards){const c=cards.find(x=>x.name===nm);if(!c)continue;const d=spend.cards[nm];let e=0,sp=0;
+for(const k in d.totals){e+=d.totals[k]*cval(c,k);sp+=d.totals[k];const b=best(k)[0];cp[prog(b.c)]=(cp[prog(b.c)]||0)+d.totals[k]*b.v;cpc[prog(b.c)]=b.c}
+ep[prog(c)]=(ep[prog(c)]||0)+e;epc[prog(c)]=c;const bd=Object.keys(d.totals).sort((a,b)=>d.totals[b]-d.totals[a]).slice(0,6).map(k=>CATS.find(x=>x[0]==k)[1]+" "+$$(d.totals[k])+" × "+mstr(c,cval(c,k))).join("<br>");
+rows+=`<div class="row"><span>${esc(nm)}<br><span class="mute">${d.from&&d.to?d.from+" to "+d.to+", ":""}${$$(sp)} spent<br>${bd}</span></span><span style="text-align:right">${fmtE(c,e)}</span></div>`}
+let te=0,tc=0;
+const prows=[...new Set([...Object.keys(ep),...Object.keys(cp)])].map(k=>{const c=epc[k]||cpc[k],e=ep[k]||0,b=cp[k]||0;if(!cash(c)){te+=e;tc+=b}return`<div class="row"><span>${esc(k)}</span><span style="text-align:right">${fmtE(c,e)} earned<br><span class="mute">${fmtE(c,b)} possible</span></span></div>`}).join("");
+earnedH=`<h2>Earned vs could have earned</h2><div class="box"><b>Earned by card</b>${rows}</div><div class="box"><b>By program</b>${prows}</div><div class="top"><span>All programs combined</span><b>${Math.round(te).toLocaleString()} earned</b><span>${Math.round(tc).toLocaleString()} could have earned, ${Math.round(tc-te).toLocaleString()} left on the table. Covers only the dates in your files. Programs aren't converted to a value.</span></div>`}
+h+=earnedH;
+h+=`<h2>Points you'd earn per year</h2><div class="box">${Object.keys(pt).map(k=>`<div class="row"><span>${esc(k)}</span><span>${fmtE(ptc[k],pt[k])}</span></div>`).join("")}</div>`;
+h+=`<h2>Spending by category</h2><div class="box">${CATS.filter(([k])=>ann[k]>0).sort((a,b)=>ann[b[0]]-ann[a[0]]).map(([k,n])=>{const b=best(k)[0];return`<div class="row"><span>${n}<br><span class="mute">Top: ${esc(b.c.name)} (${mstr(b.c,b.v)})</span></span><span>${$$(ann[k])}</span></div>`}).join("")}</div>`;
+h+=`<h2>What each card does for you</h2><div class="box">${wins.map(w=>{const cr=w.c.credits||0,fee=`Fee ${$$(w.c.fee)}${cr?", credits you use "+$$(cr):""}.`;
+const t=w.cats.length?`Tops or ties: ${w.cats.join(", ")}. About ${fmtE(w.c,w.pts)} a year if you used it for those. ${fee}`:`<span class="warn">Doesn't top or tie any category of your spending.</span> Keep it only for its perks and credits. ${fee}`;
+return`<div class="row"><span>${esc(w.c.name)}<br><span class="mute">${t}</span></span></div>`}).join("")}</div>`;
+const gaps=CATS.filter(([k])=>k!=="other"&&ann[k]>=600&&best(k)[0].v<3).map(([k,n])=>({n,v:best(k)[0],s:ann[k]})).sort((a,b)=>b.s-a.s);
+h+=`<h2>Where a new card could help</h2><div class="box">${gaps.length?gaps.map(g=>`<div class="row"><span>${g.n}<br><span class="mute">Your best is ${mstr(g.v.c,g.v.v)} on about ${$$(g.s)} a year. Cards paying 3x or more exist here.</span></span></div>`).join(""):'<span class="mute">No big gaps at a 3x benchmark.</span>'}<p class="mute">See the New tab for specific cards.</p></div>`;
+h+=`<button class="btn ghost" id="clr">Clear spending data</button>`;
+$("#out").innerHTML=h;$("#clr").onclick=()=>{spend=null;save("adv.spend",null);vSpend()}}
+const LIB=window.CARD_LIB||{cards:[],asOf:""},ASOF=LIB.asOf;
+let PERKS=[];
+const libOf=n=>LIB.cards.find(c=>c.name===n);
+function rebuildPerks(){PERKS=[];cards.forEach(c=>{const l=libOf(c.name);if(l&&l.perks)l.perks.forEach(p=>PERKS.push({...p,c:c.name}))})}
+const catalog=()=>LIB.cards.filter(l=>!cards.some(c=>c.name===l.name));
+function libCard(l,open){const rates={};CATS.forEach(([k])=>rates[k]=l.rates[k]??(TR.includes(k)?l.rates.travel:undefined)??l.rates.other??1);return{name:l.name,fee:l.fee,cpp:1,program:l.program,credits:l.credits||0,open:open||"",rates}}
+function addFromLib(n){const l=libOf(n);if(!l||cards.some(c=>c.name===n))return;cards.push(libCard(l));save("adv.cards2",cards)}
+let skip=false;
+let used=load("adv.used2",{}),man=load("adv.man",{});
+const cval=(c,k)=>(c.rates[k]??(TR.includes(k)?c.rates.travel:undefined)??c.rates.other??1);
+const prog=c=>c.program||"points",cash=c=>prog(c)==="cash back";
+const mstr=(c,v)=>v+(cash(c)?"%":"x");
+const fmtE=(c,e)=>cash(c)?"$"+(e/100).toLocaleString(undefined,{maximumFractionDigits:2}):Math.round(e).toLocaleString()+" "+prog(c);
+function evalCard(c){const yr=365/spend.days,sp=k=>(spend.totals[k]||0)*yr;let won=0,pts=0;const parts=[],base=c.rates.other??1;
+const earn=(s,cap,r)=>cap?Math.min(s,cap)*r+Math.max(0,s-cap)*base:s*r;
+CATS.forEach(([k,n])=>{const s=sp(k);if(!s)return;const cur=best(k)[0].v,nv=cval(c,k);if(nv>cur){const e=earn(s,c.caps&&c.caps[k],nv);won+=s;pts+=e;parts.push([n,nv,cur,s,e,best(k)[0].c])}});
+if(c.top){let bk=null,bs=0;c.top.cats.forEach(k=>{const s=Math.min(sp(k),c.top.cap);if(c.top.rate>best(k)[0].v&&s>bs){bs=s;bk=k}});
+if(bk&&!parts.find(p=>p[0]==CATS.find(x=>x[0]==bk)[1])){const s=sp(bk),e=earn(s,c.top.cap,c.top.rate);won+=s;pts+=e;parts.push([CATS.find(x=>x[0]==bk)[1],c.top.rate,best(bk)[0].v,s,e,best(bk)[0].c])}}
+parts.sort((a,b)=>b[3]-a[3]);const cr=pv[c.name]??c.credits;return{c,won,pts,parts,cr}}
+function vNew(){if(!cards.length||!spend){$("#v").innerHTML=`<div class="box">Upload your statements on the Spend tab first. New cards are ranked by how much of your spending they would beat your current cards on.</div>`;return}
+const CAT=catalog(),r=CAT.map(evalCard).sort((a,b)=>(b.won-a.won)||((b.cr-b.c.fee)-(a.cr-a.c.fee)));
+$("#v").innerHTML=`<p class="mute">Ranked by yearly spending where the card's multiplier beats your best current card. This compares multipliers only, not what a point is worth. Perk values are rough defaults, so edit them. Snapshot from ${ASOF}.</p>`+r.map(x=>{const i=CAT.indexOf(x.c),pf=x.cr-x.c.fee;return`<div class="box"><b>${esc(x.c.name)}</b>
+<div style="margin:6px 0">${x.won>0?`Beats your best card on ${$$(x.won)} of your yearly spend, earning about <b>${fmtE(x.c,x.pts)}</b> a year.`:`<span class="mute">Doesn't beat your current best on any of your spending.</span>`}</div>
+${x.parts.length?`<div class="mute">${x.parts.slice(0,4).map(p=>esc(p[0])+" "+mstr(x.c,p[1])+" vs your "+mstr(p[5],p[2])+" ("+$$(p[3])+")").join("<br>")}</div>`:""}
+<div class="mute" style="margin-top:6px">Fee ${$$(x.c.fee)}. Perks minus fee: <span class="${pf>=0?"good":"warn"}">${pf>=0?"+":"-"}${$$(Math.abs(pf))}</span></div>
+<label for="pv${i}">Perks you'd use ($/yr)</label><input id="pv${i}" type="number" inputmode="decimal" value="${x.cr}" data-pv="${i}">
+<p style="margin:8px 0 0">${esc(x.c.note)}</p><div class="mute" style="margin-top:6px">Welcome offer: ${esc(x.c.offer)}</div></div>`}).join("")+`<p class="mute">Rates, fees and offers change often, so check the issuer before applying. The card library is updated by hand, so see the project page for the latest.</p>`;
+$("#v").onchange=ev=>{const i=ev.target.dataset.pv;if(i===undefined)return;pv[CAT[+i].name]=parseFloat(ev.target.value)||0;save("adv.pv",pv);vNew()}}
+const autoOpen=c=>{const d=spend&&spend.cards&&spend.cards[c.name];return d&&d.feeDate||""};
+const openDate=c=>c.open||autoOpen(c);
+function openHint(e){if(!e)return"";const a=autoOpen(e);if(!a)return"";const t=fmtD(new Date(a+"T00:00:00"));
+if(!e.open)return`<div class="mute">Auto-detected from your statements: ${t} (annual fee charge). Leave this blank to use it.</div>`;
+return a.slice(5)!==e.open.slice(5)?`<div class="mute">Your statements suggest ${t} (annual fee charge), but your date is being used.</div>`:""}
+function annivs(open,now){const q=open.split("-").map(Number),t=new Date(now.getFullYear(),now.getMonth(),now.getDate());let n=new Date(t.getFullYear(),q[1]-1,q[2]);if(n<=t)n=new Date(t.getFullYear()+1,q[1]-1,q[2]);return[new Date(n.getFullYear()-1,q[1]-1,q[2]),n]}
+const fmtD=d=>d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
+function renewText(c){if(!openDate(c)||!(c.fee>0))return"";const t=new Date(),n=annivs(openDate(c),t)[1];return fmtD(n)+" ("+Math.round((n-new Date(t.getFullYear(),t.getMonth(),t.getDate()))/864e5)+" days)"}
+function win(per,now,c){const y=now.getFullYear(),m=now.getMonth();
+if(per==="m")return[new Date(y,m,1),new Date(y,m+1,0,23,59,59)];
+if(per==="q"){const q=Math.floor(m/3)*3;return[new Date(y,q,1),new Date(y,q+3,0,23,59,59)]}
+if(per==="h"){const h=m<6?0:6;return[new Date(y,h,1),new Date(y,h+6,0,23,59,59)]}
+if(per==="y")return[new Date(y,0,1),new Date(y,11,31,23,59,59)];
+if(per==="a"){if(c&&openDate(c)){const[l,n]=annivs(openDate(c),now);return[c.open?new Date(Math.max(+l,+new Date(c.open+"T00:00:00"))):l,new Date(+n-1000)]}return[new Date(+now-365*864e5),null]}
+return[new Date(+now-4*365*864e5),null]}
+const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+function assign(){rebuildPerks();const asg={};if(spend&&spend.cards)for(const nm in spend.cards){const cd=spend.cards[nm];if(cd.credits)asg[nm]=cd.credits.map(x=>({...x,pi:PERKS.findIndex(p=>p.c===nm&&p.re&&p.re.test(x.s))}))}return asg}
+function vPerks(){const now=new Date(),hasCr=spend&&spend.cards;
+const asg=assign();
+const rows=PERKS.map((p,i)=>{let exp=null,st=null;
+if(p.per){const[a,b]=win(p.per,now,cards.find(x=>x.name===p.c));exp=b;const cd=hasCr&&spend.cards[p.c],amt=typeof p.amt==="function"?p.amt(now.getMonth()):p.amt;
+const m=man[p.c+"|"+p.t]||0,ok=p.re&&cd&&cd.credits&&!(cd.to&&cd.to<iso(a));
+const stmt=ok?(asg[p.c]||[]).filter(x=>x.pi===i&&x.d&&x.d>=iso(a)&&(!b||x.d<=iso(b))).reduce((t,x)=>t+x.a,0):null;
+if(stmt!==null||m>0||!p.re||p.man){const sum=Math.max(0,(stmt||0)+m);st={k:sum>=amt*.98?"used":sum>0?"part":"unused",sum,amt}}
+else st={k:"nodata",amt,why:(p.re&&cd&&cd.credits&&cd.to&&cd.to<iso(a))?"Your statements end "+cd.to+", before this period.":undefined}}
+else if(p.exp)exp=new Date(p.exp+"T23:59:59");
+return{p,i,st,key:p.c+"|"+p.t,left:exp?Math.ceil((exp-now)/864e5):null}}).filter(r=>r.left===null||r.left>=0);
+const eff=r=>used[r.key]||(r.st&&r.st.k==="used");
+rows.sort((a,b)=>(!!eff(a)-!!eff(b))||((a.left??1e9)-(b.left??1e9)));
+const stat=r=>{const t=r.st;if(!t)return"";if(t.k==="nodata")return`<br><span class="mute">${esc(t.why||"Upload this card's statements to track it automatically.")}</span>`;
+const col=t.k==="used"?"var(--good)":t.k==="part"?"var(--warn)":"var(--line)",cls=t.k==="used"?"good":t.k==="part"?"warn":"mute";
+return`<div class="bar"><i style="width:${Math.min(100,t.sum/t.amt*100)}%;background:${col}"></i></div><span class="${cls}">${t.k==="used"?"Used":t.k==="part"?"Partly used":"Not used yet"}: ${$$(t.sum)} of ${$$(t.amt)}</span>`};
+let h=`<p class="mute">Credits are matched from the statements you uploaded, so re-upload to refresh. Tap any perk to mark it used yourself. Snapshot from ${ASOF}. Soonest deadline first.</p><div class="box">`+rows.map(r=>`<div class="row pk ${used[r.key]?"used":""}" data-p="${r.i}"><span>${esc(r.p.t)}<br><span class="mute">${esc(r.p.c)}. ${esc(r.p.d)}</span>${stat(r)}${r.p.per?`<details ${man[r.key]||r.p.man?"open":""} style="margin-top:6px"><summary class="mute" style="cursor:pointer">${man[r.key]?"You entered "+$$(man[r.key]):"Add what I received or used"}</summary><input type="number" inputmode="decimal" data-m="${r.i}" value="${man[r.key]||""}" placeholder="Amount ($) not on my statements, negative if reversed" style="margin-top:6px"></details>`:""}</span><span class="${r.left!==null&&r.left<=30?"warn":"mute"}" style="text-align:right;white-space:nowrap">${r.left===null?"Ongoing":r.left+" days"}</span></div>`).join("")+`</div>`;
+const found=[];for(const nm in asg)asg[nm].forEach(x=>found.push({nm,...x}));
+if(found.length){found.sort((a,b)=>(b.d||"").localeCompare(a.d||""));h+=`<h2>Credits found on your statements</h2><div class="box">`+found.slice(0,40).map(x=>`<div class="row"><span>${esc(x.s)}<br><span class="mute">${esc(x.nm)}, ${x.d||"no date"}. ${x.a<0?"Reversal. ":""}${x.pi>=0?"Matched: "+esc(PERKS[x.pi].t):"No perk matched"}</span></span><span>${x.a<0?"-"+$$(-x.a):$$(x.a)}</span></div>`).join("")+`</div>`}
+else if(hasCr)h+=`<p class="mute">No statement credits were found in your uploads. If you expect some, check how they appear in the description column of your CSV.</p>`;
+$("#v").innerHTML=h;
+$("#v").onchange=ev=>{const i=ev.target.dataset.m;if(i===undefined)return;man[PERKS[+i].c+"|"+PERKS[+i].t]=parseFloat(ev.target.value)||0;save("adv.man",man);vPerks()};
+$("#v").onclick=ev=>{if(["INPUT","SUMMARY","DETAILS"].includes(ev.target.tagName))return;const t=ev.target.closest("[data-p]");if(!t)return;const k=PERKS[+t.dataset.p].c+"|"+PERKS[+t.dataset.p].t;used[k]=!used[k];save("adv.used2",used);vPerks()}}
+function vVerdict(){if(!cards.length)return needCards();
+const asg=assign(),yr=String(new Date().getFullYear());
+const rows=cards.map(c=>{const mine=asg[c.name]||[];
+const byp={};mine.filter(x=>x.pi>=0&&x.d&&((PERKS[x.pi].per==="a"&&openDate(c))?x.d>=iso(win("a",new Date(),c)[0]):x.d.slice(0,4)===yr)).forEach(x=>byp[x.pi]=(byp[x.pi]||0)+x.a);
+let st=0,cr=0;PERKS.forEach((p,i)=>{if(p.c!==c.name||!p.per)return;const s_=byp[i]||0;st+=Math.max(0,s_);cr+=Math.max(0,s_+(man[p.c+"|"+p.t]||0))});
+const mn=cr-st,un=Math.max(0,mine.filter(x=>x.pi<0&&x.d&&x.d.slice(0,4)===yr).reduce((t,x)=>t+x.a,0));
+const fee=c.fee||0,d=spend&&spend.cards&&spend.cards[c.name];
+let pts=null,spent=0;if(d){pts=0;for(const k in d.totals){pts+=d.totals[k]*cval(c,k);spent+=d.totals[k]}}
+let tops=0;if(spend)CATS.forEach(([k])=>{if((spend.totals[k]||0)>0&&cval(c,k)>=best(k)[0].v)tops++});
+const pvd=pts===null?0:(cash(c)?pts/100:pts/pval),total=cr+pvd,ratio=fee?total/fee:1,pct=Math.round(ratio*100);let v,why;
+if(!fee){v="Keep";why="No annual fee."}
+else if(!d&&mn===0){v="Need data";why="Upload this card's statements or enter credits on the Perks tab to get a verdict."}
+else if(ratio>=1){v="Keep";why=`Credits plus points cover the fee${cr>=fee?" (credits alone do)":""}, with ${$$(total-fee)} to spare.`}
+else if(ratio>=.5){v="May keep";why=`Credits plus points cover ${pct}% of the fee, ${$$(fee-total)} short.`}
+else{v="Don't keep";why=`Credits plus points cover only ${pct}% of the fee, ${$$(fee-total)} short.`}
+return{c,cr,st,mn,un,fee,pts,pvd,spent,d,v,why,ren:renewText(c)}});
+$("#v").innerHTML=`<div class="box"><label for="pvl" style="margin-top:0">Points that count as $1 (used only for these verdicts)</label><input id="pvl" type="number" inputmode="decimal" value="${pval}"></div><p class="mute">Credits are counted from your statements this year (matched to perks) plus the amounts you typed on the Perks tab. Points come from your uploaded statements. For this verdict only, ${pval} points count as $1 (you can change that below), and credits plus points are compared with the annual fee. It's based on this year so far.</p>`+rows.map(r=>`<div class="box"><b>${esc(r.c.name)}</b>
+<div style="font:600 22px ui-serif,Georgia,serif;margin:4px 0;color:${r.v==="Keep"?"var(--good)":r.v==="May keep"?"var(--acc)":r.v==="Need data"?"var(--mute)":"var(--warn)"}">${r.v}</div>
+<div class="row"><span>Annual fee</span><span>${$$(r.fee)}</span></div>${r.ren?`<div class="row"><span>Next renewal<br><span class="mute">Decide before this date${r.c.open?"":" (from your annual fee charge)"}</span></span><span style="text-align:right">${r.ren}</span></div>`:""}
+<div class="row"><span>Credits received this year<br><span class="mute">${$$(r.st)} on statements + ${r.mn<0?"-"+$$(-r.mn):$$(r.mn)} you entered</span></span><span>${$$(r.cr)}</span></div>
+<div class="row"><span>Points earned<br><span class="mute">${r.d?(r.d.from&&r.d.to?r.d.from+" to "+r.d.to+", ":"")+$$(r.spent)+" spent":"Upload this card's statements"}</span></span><span style="text-align:right">${r.pts===null?"":fmtE(r.c,r.pts)+`<br><span class="mute">worth ${$$(r.pvd)} at ${pval} = $1</span>`}</span></div>
+<p style="margin:8px 0 0">${esc(r.why)}</p>${r.un>0?`<p class="mute" style="margin:6px 0 0">${$$(r.un)} of other statement credits weren't matched to a perk and aren't counted.</p>`:""}</div>`).join("");
+$("#v").onchange=ev=>{if(ev.target.id==="pvl"){const n=parseFloat(ev.target.value);pval=n>0?n:100;save("adv.pval",pval);vVerdict()}};$("#v").onclick=null}
+const KEYS=["adv.pval","adv.cards2","adv.spend","adv.used2","adv.man","adv.offers","adv.pv"];
+function bk(){$("#bk").innerHTML=`<h2>Backup and transfer</h2><div class="box"><p class="mute" style="margin-top:0">Your data lives only in this browser. Export it as text to keep a backup or move it to another device, then paste it back here to restore. It holds your cards, spending totals, and entries, so keep it somewhere private.</p><button class="btn ghost" id="bx">Export as text</button><textarea id="bt" rows="5" style="width:100%;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:12px ui-monospace,monospace" placeholder="Exported text appears here. To restore, paste it here and tap the button below."></textarea><button class="btn" id="bi">Restore from pasted text</button><div id="bm" class="mute" style="margin-top:8px"></div></div>`;
+$("#bx").onclick=()=>{const o={v:1};KEYS.forEach(k=>{try{const v=localStorage.getItem(k);if(v)o[k]=JSON.parse(v)}catch(e){}});const t=JSON.stringify(o);$("#bt").value=t;$("#bt").select();let ok=false;try{navigator.clipboard.writeText(t);ok=true}catch(e){}$("#bm").textContent=ok?"Exported and copied. Paste it into Notes or a message to yourself.":"Exported. Select all the text and copy it."};
+$("#bi").onclick=()=>{try{const o=JSON.parse($("#bt").value);if(!o||o.v!==1)throw 0;KEYS.forEach(k=>{if(o[k]!==undefined)save(k,o[k])});cards=load("adv.cards2",[]);spend=load("adv.spend",null);used=load("adv.used2",{});man=load("adv.man",{});offers=load("adv.offers",[]);pv=load("adv.pv",{});vWallet();$("#bm").textContent="Restored."}catch(e){$("#bm").textContent="That text doesn't look like a Card Advisor export."}}}
+function vWelcome(){const groups={};LIB.cards.forEach(l=>(groups[l.group||"Other"]=groups[l.group||"Other"]||[]).push(l));
+$("#v").innerHTML=`<div class="box"><b>Welcome</b><p class="mute">Pick the cards you own. Everything stays in this browser. Nothing is uploaded, and there are no logins.</p><input id="wq" placeholder="Search cards" autocomplete="off"></div><div id="wl"></div><button class="btn" id="wg">Add selected cards</button><button class="btn ghost" id="wm">I'll add them by hand</button>`;
+const sel=new Set();
+const draw=()=>{const q=$("#wq").value.trim().toLowerCase();$("#wl").innerHTML=Object.keys(groups).map(g=>{const it=groups[g].filter(l=>!q||l.name.toLowerCase().includes(q));return it.length?`<div class="box"><b>${esc(g)}</b>${it.map(l=>`<label class="row" style="margin:0;align-items:center;color:var(--ink);font-size:16px"><span>${esc(l.name)}<br><span class="mute">${$$(l.fee)}/yr fee</span></span><input type="checkbox" data-w="${esc(l.name)}" style="width:auto" ${sel.has(l.name)?"checked":""}></label>`).join("")}</div>`:""}).join("")};
+draw();
+$("#wq").oninput=draw;
+$("#wl").onchange=e=>{const n=e.target.dataset.w;if(n===undefined)return;if(e.target.checked)sel.add(n);else sel.delete(n)};
+$("#wg").onclick=()=>{if(!sel.size)return;sel.forEach(n=>addFromLib(n));render()};
+$("#wm").onclick=()=>{skip=true;tab="wallet";render()}}
+render();
+</script>
+</body>
+</html>
