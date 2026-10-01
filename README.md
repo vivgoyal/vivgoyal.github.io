@@ -17,13 +17,6 @@ There is no server, no account, and no login. Your cards, spending totals, and e
 
 Open the site and pick the cards you own. On iPhone, open it in Safari and use **Share > Add to Home Screen**. Add your cards before you add it to the Home Screen only if you plan to use the browser; iOS keeps Home Screen app storage separate from Safari.
 
-## Host it on GitHub Pages
-
-1. Create a **public** repository and upload `index.html`, `cards.js`, and this README. (GitHub Pages on a private repository needs a paid plan.)
-2. In the repository, open **Settings > Pages**, choose **Deploy from a branch**, pick `main` and `/ (root)`, and save.
-3. After a minute the site is live at `https://YOUR-USERNAME.github.io/REPO-NAME/`.
-
-Never commit an export of your own data to a public repository.
 
 ## Add or fix a card
 
